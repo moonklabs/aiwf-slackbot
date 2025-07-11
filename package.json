@@ -1,0 +1,36 @@
+{
+  "name": "claude-gemini-slackbot",
+  "version": "1.0.0",
+  "description": "원격 Claude Code 및 Gemini CLI 실행을 위한 Slack 봇",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  },
+  "keywords": ["slack", "bot", "claude-code", "gemini", "remote-execution"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@slack/bolt": "^3.17.1",
+    "@slack/web-api": "^7.0.1",
+    "dotenv": "^16.4.1",
+    "winston": "^3.11.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.11",
+    "ts-jest": "^29.1.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "@types/uuid": "^9.0.7"
+  }
+}

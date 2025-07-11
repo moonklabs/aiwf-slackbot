@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  slackbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claude-gemini-slackbot
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    volumes:
+      # Agent 데이터 영구 저장
+      - agent-data:/app/workspace/agents
+      # 로그 파일
+      - ./logs:/app/logs
+      # 개발 시 로컬 workspace 마운트 (선택사항)
+      # - ./workspace:/app/workspace
+    networks:
+      - slackbot-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # 개발 환경용 서비스 (프로파일 사용)
+  slackbot-dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: claude-gemini-slackbot-dev
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # 소스 코드 마운트 (핫 리로딩)
+      - ./src:/app/src
+      - ./workspace:/app/workspace
+      - ./logs:/app/logs
+      # node_modules 제외
+      - /app/node_modules
+    command: npm run dev
+    networks:
+      - slackbot-network
+
+volumes:
+  agent-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./workspace/agents
+
+networks:
+  slackbot-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
