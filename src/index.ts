@@ -2,6 +2,7 @@ import { App } from '@slack/bolt';
 import { validateConfig, Config } from './utils/config';
 import { logger } from './utils/logger';
 import { SlackHandler } from './handlers/slackHandler';
+import { MCPServer } from './mcp/server';
 
 async function main() {
   try {
@@ -21,6 +22,14 @@ async function main() {
     // 핸들러 초기화
     const slackHandler = new SlackHandler(app);
     await slackHandler.initialize();
+    
+    // MCP 서버 시작 (설정된 경우)
+    if (process.env.MCP_ENABLED === 'true') {
+      const mcpServer = new MCPServer();
+      const mcpPort = parseInt(process.env.MCP_PORT || '3001');
+      await mcpServer.startHttp(mcpPort);
+      logger.info(`🚀 MCP 서버가 포트 ${mcpPort}에서 실행 중입니다!`);
+    }
     
     // 앱 시작
     await app.start();

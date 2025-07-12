@@ -10,11 +10,14 @@ import { AgentType } from '../types';
 import { SecurityValidator } from '../utils/security';
 import { Config } from '../utils/config';
 import { AgentSlackHandler } from './agentSlackHandler';
+import { MCPClient } from '../services/mcpClient';
 
 export class SlackHandler {
   private app: App;
   private executor: CommandExecutor;
   private agentHandler: AgentSlackHandler;
+  private mcpClient?: MCPClient;
+  private mcpEnabled: boolean = false;
   
   constructor(app: App) {
     this.app = app;
@@ -28,14 +31,28 @@ export class SlackHandler {
    */
   async initialize(): Promise<void> {
     await this.agentHandler.initialize();
+    
+    // MCP 서버가 설정된 경우 클라이언트 초기화
+    const mcpUrl = process.env.MCP_SERVER_URL || 'http://localhost:3001';
+    if (process.env.MCP_ENABLED === 'true') {
+      try {
+        this.mcpClient = new MCPClient({
+          baseUrl: mcpUrl,
+        });
+        this.mcpEnabled = true;
+        logger.info('[SlackHandler] MCP client initialized');
+      } catch (error) {
+        logger.error('[SlackHandler] Failed to initialize MCP client:', error);
+      }
+    }
   }
   
   private registerHandlers() {
     // /claude 명령어 처리
-    (this.app as any).command('/claude', this.handleClaudeCommand.bind(this));
+    this.app.command('/claude', this.handleClaudeCommand.bind(this));
     
     // /gemini 명령어 처리
-    (this.app as any).command('/gemini', this.handleGeminiCommand.bind(this));
+    this.app.command('/gemini', this.handleGeminiCommand.bind(this));
     
     // 메시지 이벤트 처리 (멘션된 경우)
     this.app.event('app_mention', async ({ event, client, say }) => {
@@ -106,43 +123,49 @@ export class SlackHandler {
     });
     
     try {
-      const result = await this.executor.executeClaude(command.text);
-      
-      if (result.success) {
-        await respond({
-          text: '✅ Claude Code 실행 완료',
-          blocks: [
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: `*실행 결과:*\n\`\`\`\n${result.output}\n\`\`\``
-              }
-            },
-            {
-              type: 'context',
-              elements: [
-                {
-                  type: 'mrkdwn',
-                  text: `실행 시간: ${result.executionTime}ms`
-                }
-              ]
-            }
-          ]
-        });
+      // MCP가 활성화된 경우 MCP 사용
+      if (this.mcpEnabled && this.mcpClient) {
+        await this.executeThroughMCP(command, respond);
       } else {
-        await respond({
-          text: '❌ Claude Code 실행 실패',
-          blocks: [
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: `*오류:*\n\`\`\`\n${result.error}\n\`\`\``
+        // 기존 직접 실행 방식
+        const result = await this.executor.executeClaude(command.text);
+        
+        if (result.success) {
+          await respond({
+            text: '✅ Claude Code 실행 완료',
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*실행 결과:*\n\`\`\`\n${result.output}\n\`\`\``
+                }
+              },
+              {
+                type: 'context',
+                elements: [
+                  {
+                    type: 'mrkdwn',
+                    text: `실행 시간: ${result.executionTime}ms`
+                  }
+                ]
               }
-            }
-          ]
-        });
+            ]
+          });
+        } else {
+          await respond({
+            text: '❌ Claude Code 실행 실패',
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*오류:*\n\`\`\`\n${result.error}\n\`\`\``
+                }
+              }
+            ]
+          });
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -377,6 +400,127 @@ export class SlackHandler {
         ts: runningMsg.ts,
         text: `❌ 오류 발생: ${errorMessage}`
       });
+    }
+  }
+  
+  /**
+   * MCP를 통한 Claude 실행
+   */
+  private async executeThroughMCP(command: SlashCommand, respond: any) {
+    if (!this.mcpClient) {
+      throw new Error('MCP client not initialized');
+    }
+    
+    try {
+      // MCP 세션 초기화 (사용자별)
+      let session = this.mcpClient.getSession();
+      if (!session || session.userId !== command.user_id) {
+        session = await this.mcpClient.initialize(command.user_id);
+      }
+      
+      // 기본 Agent 가져오기 또는 생성
+      const agents = await this.mcpClient.listAgents(command.user_id);
+      let agentId: string;
+      
+      if (agents.metadata?.agents?.length > 0) {
+        // 기본 Agent 사용
+        agentId = agents.metadata.agents[0].id;
+      } else {
+        // 임시 Agent 생성
+        await respond({
+          text: '⚙️ 기본 Agent를 생성하고 있습니다...'
+        });
+        
+        const newAgent = await this.mcpClient.createAgent(
+          command.user_id,
+          'https://github.com/moonklabs/default-workspace',
+          'main',
+          'default'
+        );
+        agentId = newAgent.metadata.agentId;
+      }
+      
+      // 스트리밍 출력 버퍼
+      let outputBuffer = '';
+      let lastUpdateTime = Date.now();
+      
+      // SSE 이벤트 리스너 설정
+      this.mcpClient.on('output', async (data: string) => {
+        outputBuffer += data;
+        
+        // 일정 시간마다 또는 버퍼가 충분히 찼을 때 업데이트
+        const now = Date.now();
+        if (now - lastUpdateTime > 1000 || outputBuffer.length > 1000) {
+          await respond({
+            text: '🔄 실행 중...',
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*실행 중:*\n\`\`\`\n${outputBuffer}\n\`\`\``
+                }
+              }
+            ]
+          });
+          lastUpdateTime = now;
+        }
+      });
+      
+      this.mcpClient.on('error', async (data: string) => {
+        await respond({
+          text: `⚠️ 오류: ${data}`
+        });
+      });
+      
+      // Claude 실행
+      const result = await this.mcpClient.executeClaude(agentId, command.text, true);
+      
+      // 최종 결과 전송
+      if (result.metadata?.success) {
+        await respond({
+          text: '✅ Claude Code 실행 완료 (MCP)',
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*실행 결과:*\n\`\`\`\n${result.content[0].text}\n\`\`\``
+              }
+            },
+            {
+              type: 'context',
+              elements: [
+                {
+                  type: 'mrkdwn',
+                  text: `실행 시간: ${result.metadata.executionTime}ms | Agent: ${agentId}`
+                }
+              ]
+            }
+          ]
+        });
+      } else {
+        await respond({
+          text: '❌ Claude Code 실행 실패 (MCP)',
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*오류:*\n\`\`\`\n${result.content[0].text}\n\`\`\``
+              }
+            }
+          ]
+        });
+      }
+      
+      // 이벤트 리스너 정리
+      this.mcpClient.removeAllListeners('output');
+      this.mcpClient.removeAllListeners('error');
+      
+    } catch (error) {
+      logger.error('[SlackHandler] MCP execution error:', error);
+      throw error;
     }
   }
 }

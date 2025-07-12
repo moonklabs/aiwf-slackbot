@@ -74,3 +74,6 @@ export interface AppConfig {
   workspaceDir: string;
   commandTimeout: number;
 }
+
+// MCP 관련 타입 re-export
+export * from './mcp';

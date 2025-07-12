@@ -32,6 +32,12 @@ Slack에서 Claude Code와 Gemini CLI를 실행할 수 있는 강력한 봇입�
 - **멘션 응답**: 채널에서 @멘션으로 호출
 - **스레드 지원**: 대화 컨텍스트 유지
 
+### 🔌 MCP (Model Context Protocol) 지원 (BETA)
+- **원격 실행**: API 키 없이 서버에서 Claude 실행
+- **SSE 스트리밍**: 실시간 출력 스트리밍
+- **세션 관리**: 사용자별 독립 세션
+- **도구 확장**: 커스텀 도구 추가 가능
+
 ## 🚀 빠른 시작
 
 ### 1. 설치
@@ -110,7 +116,10 @@ docker-compose up -d
 │   ├── handlers/          # Slack 이벤트 핸들러
 │   ├── services/          # 비즈니스 로직
 │   ├── utils/             # 유틸리티 함수
-│   └── types/             # TypeScript 타입 정의
+│   ├── types/             # TypeScript 타입 정의
+│   └── mcp/               # MCP 서버 구현
+│       ├── transports/    # HTTP/SSE transport
+│       └── tools/         # MCP 도구
 ├── tests/                 # 테스트 파일
 ├── docs/                  # 문서
 ├── workspace/             # Agent 작업 공간
@@ -162,6 +171,9 @@ npm test           # 테스트 실행
 | `LOG_LEVEL` | info | 로그 레벨 |
 | `WORKSPACE_DIR` | ./workspace | Agent 작업 디렉토리 |
 | `COMMAND_TIMEOUT` | 600000 | 명령어 타임아웃 (ms) |
+| `MCP_ENABLED` | false | MCP 서버 활성화 |
+| `MCP_PORT` | 3001 | MCP 서버 포트 |
+| `MCP_SERVER_URL` | http://localhost:3001 | MCP 서버 URL |
 
 ## 🤝 기여
 
