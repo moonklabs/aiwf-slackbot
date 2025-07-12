@@ -10,10 +10,14 @@ export class AgentManager {
   private agents: Map<string, AgentConfig>;
   private storageFile: string;
   private repositoryManager: RepositoryManager;
+  private workspaceDir: string;
+  private agentsFilePath: string;
   
-  constructor() {
+  constructor(workspaceDir?: string) {
     this.agents = new Map();
-    this.storageFile = path.join(Config.workspaceDir, 'agents.json');
+    this.workspaceDir = workspaceDir || Config.workspaceDir;
+    this.storageFile = path.join(this.workspaceDir, 'agents.json');
+    this.agentsFilePath = this.storageFile;
     this.repositoryManager = new RepositoryManager();
   }
   
@@ -21,6 +25,21 @@ export class AgentManager {
    * 저장소에서 Agent 목록 로드
    */
   async initialize(): Promise<void> {
+    // workspace 디렉토리 확인 및 생성
+    try {
+      await fs.access(this.workspaceDir);
+    } catch {
+      await fs.mkdir(this.workspaceDir, { recursive: true });
+      await fs.mkdir(path.join(this.workspaceDir, 'agents'), { recursive: true });
+    }
+
+    // agents.json 파일 확인 및 생성
+    try {
+      await fs.access(this.agentsFilePath);
+    } catch {
+      await this.saveAgents();
+    }
+
     try {
       const data = await fs.readFile(this.storageFile, 'utf-8');
       const agentsArray: AgentConfig[] = JSON.parse(data);
@@ -54,6 +73,13 @@ export class AgentManager {
   }
   
   /**
+   * 빈 agents.json 파일 생성
+   */
+  private async saveAgents(): Promise<void> {
+    await fs.writeFile(this.agentsFilePath, '[]', 'utf-8');
+  }
+  
+  /**
    * 새로운 Agent 생성
    */
   async createAgent(
@@ -67,7 +93,7 @@ export class AgentManager {
     } = {}
   ): Promise<AgentConfig> {
     const agentId = uuidv4();
-    const agentDir = path.join(Config.workspaceDir, 'agents', agentId);
+    const agentDir = path.join(this.workspaceDir, 'agents', agentId);
     const repoDir = path.join(agentDir, 'repo');
     
     const agent: AgentConfig = {
@@ -184,7 +210,7 @@ export class AgentManager {
     }
     
     // 디렉토리 삭제
-    const agentDir = path.join(Config.workspaceDir, 'agents', agent.id);
+    const agentDir = path.join(this.workspaceDir, 'agents', agent.id);
     try {
       await fs.rm(agentDir, { recursive: true, force: true });
     } catch (error) {

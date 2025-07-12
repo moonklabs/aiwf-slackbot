@@ -1,6 +1,20 @@
 import winston from 'winston';
 import { Config } from './config';
 
+// 순환 참조 제거를 위한 JSON.stringify 대체
+function safeStringify(obj: any): string {
+  const cache = new Set();
+  return JSON.stringify(obj, (_key, value) => {
+    if (typeof value === 'object' && value !== null) {
+      if (cache.has(value)) {
+        return '[Circular]';
+      }
+      cache.add(value);
+    }
+    return value;
+  });
+}
+
 export const logger = winston.createLogger({
   level: Config.logLevel,
   format: winston.format.combine(
@@ -18,7 +32,7 @@ export const logger = winston.createLogger({
         winston.format.printf(({ timestamp, level, message, ...meta }) => {
           let log = `${timestamp} [${level}]: ${message}`;
           if (Object.keys(meta).length > 0) {
-            log += ` ${JSON.stringify(meta)}`;
+            log += ` ${safeStringify(meta)}`;
           }
           return log;
         })

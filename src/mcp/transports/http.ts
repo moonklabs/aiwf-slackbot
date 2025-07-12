@@ -32,7 +32,8 @@ export class HttpTransport {
       res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       
       if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
+        res.sendStatus(200);
+        return;
       }
       
       next();
@@ -75,7 +76,7 @@ export class HttpTransport {
       const sessionId = req.headers['mcp-session-id'] as string;
       
       if (!sessionId || !this.sessions.has(sessionId)) {
-        return res.status(400).json({
+        res.status(400).json({
           jsonrpc: '2.0',
           error: {
             code: -32000,
@@ -83,6 +84,7 @@ export class HttpTransport {
           },
           id: req.body.id || null,
         });
+        return;
       }
 
       const session = this.sessions.get(sessionId)!;
@@ -107,7 +109,8 @@ export class HttpTransport {
       const sessionId = req.headers['mcp-session-id'] as string;
       
       if (!sessionId || !this.sessions.has(sessionId)) {
-        return res.status(400).send('Invalid or missing session ID');
+        res.status(400).send('Invalid or missing session ID');
+        return;
       }
 
       // SSE 헤더 설정
@@ -155,15 +158,40 @@ export class HttpTransport {
       const session = this.sessions.get(sessionId);
 
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       res.json({
-        session,
-        queueLength: (this.messageQueues.get(sessionId) || []).length,
-        connectedClients: Array.from(this.clients.values())
-          .filter(c => c.session.id === sessionId).length,
+        id: session.id,
+        userId: session.userId,
+        createdAt: session.createdAt,
+        lastActivity: session.lastActivity,
       });
+    });
+
+    // 세션 삭제
+    this.app.delete('/mcp/session/:sessionId', (req, res) => {
+      const sessionId = req.params.sessionId;
+      const session = this.sessions.get(sessionId);
+
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      // 세션 관련 클라이언트 연결 종료
+      Array.from(this.clients.entries())
+        .filter(([_, client]) => client.session.id === sessionId)
+        .forEach(([clientId, _]) => {
+          this.clients.delete(clientId);
+        });
+
+      // 세션 삭제
+      this.sessions.delete(sessionId);
+      this.messageQueues.delete(sessionId);
+
+      res.json({ message: 'Session deleted', sessionId });
     });
   }
 

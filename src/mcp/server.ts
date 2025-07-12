@@ -26,9 +26,9 @@ export class MCPServer {
   private claudeTool: ClaudeTool;
   private agentTools: AgentTools;
 
-  constructor() {
+  constructor(workspaceDir?: string) {
     // 서비스 초기화
-    this.agentManager = new AgentManager();
+    this.agentManager = new AgentManager(workspaceDir);
     this.repoManager = new RepositoryManager();
     this.commandExecutor = new CommandExecutor();
     

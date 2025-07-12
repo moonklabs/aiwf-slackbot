@@ -84,9 +84,10 @@ export class MCPClient extends EventEmitter {
     
     // Node.js 환경에서는 EventSource polyfill 필요
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const EventSourcePolyfill = require('eventsource');
+    const EventSourceModule = require('eventsource');
+    const EventSource = EventSourceModule.EventSource || EventSourceModule;
     
-    this.sseConnection = new EventSourcePolyfill(sseUrl, {
+    this.sseConnection = new EventSource(sseUrl, {
       headers: {
         'Mcp-Session-Id': this.session.id,
       },
