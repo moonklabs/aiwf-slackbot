@@ -22,6 +22,7 @@ export class MCPServer {
   private repoManager: RepositoryManager;
   private commandExecutor: CommandExecutor;
   private multiSessionTransport?: MultiSessionHttpTransport;
+  private httpTransport?: HttpTransport;
   private claudeTool: ClaudeTool;
   private agentTools: AgentTools;
 
@@ -171,6 +172,15 @@ export class MCPServer {
     });
     
     await httpTransport.listen(port);
+    this.httpTransport = httpTransport;
     logger.info(`[MCP Server] HTTP/SSE transport started on port ${port}`);
+  }
+
+  // 서버 종료
+  async stop(): Promise<void> {
+    if (this.httpTransport) {
+      await this.httpTransport.close();
+    }
+    logger.info('[MCP Server] Stopped');
   }
 }

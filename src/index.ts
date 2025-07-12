@@ -5,6 +5,8 @@ import { SlackHandler } from './handlers/slackHandler';
 import { MCPServer } from './mcp/server';
 
 async function main() {
+  let mcpServer: MCPServer | null = null;
+  
   try {
     // 설정 검증
     validateConfig();
@@ -25,7 +27,7 @@ async function main() {
     
     // MCP 서버 시작 (설정된 경우)
     if (process.env.MCP_ENABLED === 'true') {
-      const mcpServer = new MCPServer();
+      mcpServer = new MCPServer();
       const mcpPort = parseInt(process.env.MCP_PORT || '3001');
       await mcpServer.startHttp(mcpPort);
       logger.info(`🚀 MCP 서버가 포트 ${mcpPort}에서 실행 중입니다!`);
@@ -36,11 +38,21 @@ async function main() {
     logger.info(`⚡️ Claude-Gemini Slack 봇이 포트 ${Config.port}에서 실행 중입니다!`);
     
     // 프로세스 종료 처리
-    process.on('SIGINT', async () => {
+    const shutdown = async () => {
       logger.info('봇을 종료합니다...');
+      
+      // MCP 서버 종료
+      if (mcpServer) {
+        await mcpServer.stop();
+      }
+      
+      // Slack 앱 종료
       await app.stop();
       process.exit(0);
-    });
+    };
+    
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
     
   } catch (error) {
     logger.error('봇 시작 중 오류 발생:', error);

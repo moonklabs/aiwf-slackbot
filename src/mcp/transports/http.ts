@@ -214,11 +214,35 @@ export class HttpTransport {
 
   // 서버 시작
   public listen(port: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const server = this.app.listen(port)
+        .on('listening', () => {
+          logger.info(`[MCP HTTP] Server listening on port ${port}`);
+          resolve();
+        })
+        .on('error', (err: any) => {
+          if (err.code === 'EADDRINUSE') {
+            logger.error(`[MCP HTTP] Port ${port} is already in use`);
+          }
+          reject(err);
+        });
+      
+      // 서버 인스턴스 저장 (나중에 종료할 때 사용)
+      (this as any).server = server;
+    });
+  }
+
+  // 서버 종료
+  public close(): Promise<void> {
     return new Promise((resolve) => {
-      this.app.listen(port, () => {
-        logger.info(`[MCP HTTP] Server listening on port ${port}`);
+      if ((this as any).server) {
+        (this as any).server.close(() => {
+          logger.info('[MCP HTTP] Server closed');
+          resolve();
+        });
+      } else {
         resolve();
-      });
+      }
     });
   }
 

@@ -4,7 +4,8 @@
   "description": "원격 Claude Code 및 Gemini CLI 실행을 위한 Slack 봇",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "NODE_ENV=development tsx watch src/index.ts",
+    "dev:mcp": "NODE_ENV=development MCP_ENABLED=true tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
