@@ -150,6 +150,7 @@ npm test           # 테스트 실행
 
 - [빠른 시작 가이드](docs/QUICK_START.md) - 처음 시작하는 분들을 위한 가이드
 - [Slack 사용 가이드](docs/SLACK_USAGE.md) - 상세한 사용법과 예시
+- [MCP 사용 가이드](docs/MCP_USAGE_GUIDE.md) - MCP 서버 설정 및 사용법 (NEW!)
 - [Docker 설정 가이드](docs/DOCKER_SETUP.md) - Docker 환경 구축
 - [개발자 가이드](CLAUDE.md) - 개발 및 확장 가이드
 

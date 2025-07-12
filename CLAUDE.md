@@ -136,6 +136,11 @@ workspace/                 # Agent 작업 공간
    - `AgentSlackHandler`에 명령어 핸들러 추가
    - Repository 관련 작업은 `RepositoryManager` 활용
 
+5. **MCP 도구 추가**
+   - `mcp/tools/` 디렉토리에 새 도구 클래스 생성
+   - `getToolDefinition()` 메서드로 도구 정의
+   - `MCPServer`에 도구 등록
+
 ## 디버깅
 
 로그 레벨 설정:
